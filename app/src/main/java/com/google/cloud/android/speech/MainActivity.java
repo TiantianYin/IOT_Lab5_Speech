@@ -22,6 +22,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.content.res.Resources;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.annotation.NonNull;
@@ -32,6 +33,7 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -39,10 +41,55 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 
+class postCommand extends AsyncTask<String, Integer, String> {
+    protected String doInBackground(String... strings) {
+        String line = "";
+        StringBuilder total = new StringBuilder();
+        try {
+            URL url = new URL(strings[0]);
+            StringBuilder buf = new StringBuilder();
+            buf.append("input=" + URLEncoder.encode(strings[1], "UTF-8") + "&");
+            byte[] data = buf.toString().getBytes("UTF-8");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            OutputStream out = conn.getOutputStream();
+            out.write(data);
+            Log.i(MainActivity.ACTIVITY_TAG, "wait for it");
+            if (conn.getResponseCode() == 200) {
+                Log.i(MainActivity.ACTIVITY_TAG, "Success");
+                InputStream in = conn.getInputStream();
+                BufferedReader r = new BufferedReader(new InputStreamReader(in));
+                while ((line = r.readLine()) != null) {
+                    total.append(line).append('\n');
+                    Log.i(MainActivity.ACTIVITY_TAG, line);
+                }
+                Log.i(MainActivity.ACTIVITY_TAG, total.toString());
+            } else {
+                Log.i(MainActivity.ACTIVITY_TAG, "fail");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        Log.i(MainActivity.ACTIVITY_TAG, "result:");
+        Log.i(MainActivity.ACTIVITY_TAG, total.toString());
+        return total.toString();
+    }
+}
 
 public class MainActivity extends AppCompatActivity implements MessageDialogFragment.Listener {
+    protected static final String ACTIVITY_TAG="MainActivity";
 
     private static final String FRAGMENT_MESSAGE_DIALOG = "message_dialog";
 
@@ -289,7 +336,14 @@ public class MainActivity extends AppCompatActivity implements MessageDialogFrag
 
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
-            holder.text.setText(mResults.get(position));
+            String apiResult = mResults.get(position);
+            String serverResult = "";
+            try {
+                serverResult = new postCommand().execute("http:///3c1ba243.ngrok.io/", apiResult).get();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            holder.text.setText(serverResult);
         }
 
         @Override
